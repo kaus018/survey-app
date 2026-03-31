@@ -10,7 +10,8 @@ import surveyRoutes from './routes/surveyRoutes.js'
 import { generateCSRFToken, verifyCSRFToken } from './middleware/csrf.js'
 import { securityLogger, logSuspiciousInput } from './middleware/security.js'
 
-dotenv.config()
+dotenv.config({ path: './.env' })
+console.log('MONGO_URI:', process.env.MONGO_URI)
 connectDB()
 
 const app = express()

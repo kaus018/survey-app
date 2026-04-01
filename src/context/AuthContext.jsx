@@ -4,7 +4,7 @@ import { validateEmail, isInputSafe } from "../utils/security"
 
 const AuthContext = createContext()
 
-const API_URL = "http://localhost:5000/api"
+const API_URL = "http://localhost:5001/api"
 
 // Create axios instance with CSRF token handling
 const apiClient = axios.create({
@@ -138,7 +138,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, error, register, login, logout, apiClient }}>
+    <AuthContext.Provider value={{ user, setUser, token, loading, error, register, login, logout, apiClient }}>
       {children}
     </AuthContext.Provider>
   )

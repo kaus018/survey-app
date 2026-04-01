@@ -5,21 +5,15 @@ const csrfTokens = new Map()
 
 // Generate CSRF token
 export const generateCSRFToken = (req, res, next) => {
-  if (!req.session) {
-    req.session = {}
-  }
-  
-  // Generate new token if one doesn't exist
-  if (!req.session.csrfToken) {
-    req.session.csrfToken = crypto.randomBytes(32).toString('hex')
-    csrfTokens.set(req.session.csrfToken, {
-      createdAt: Date.now(),
-      used: false
-    })
-  }
-  
+  // Generate new token for each request
+  const token = crypto.randomBytes(32).toString('hex')
+  csrfTokens.set(token, {
+    createdAt: Date.now(),
+    used: false
+  })
+
   // Return token in response header
-  res.set('X-CSRF-Token', req.session.csrfToken)
+  res.set('X-CSRF-Token', token)
   next()
 }
 
@@ -30,36 +24,36 @@ export const verifyCSRFToken = (req, res, next) => {
     return next()
   }
 
-  const token = req.headers['x-csrf-token'] || req.body._csrf
+  const token = req.headers['x-csrf-token']
 
   if (!token) {
-    return res.status(403).json({ 
+    return res.status(403).json({
       message: 'CSRF token missing',
       code: 'CSRF_MISSING'
     })
   }
 
   if (!csrfTokens.has(token)) {
-    return res.status(403).json({ 
+    return res.status(403).json({
       message: 'Invalid CSRF token',
       code: 'CSRF_INVALID'
     })
   }
 
   const tokenData = csrfTokens.get(token)
-  
-  // Check if token has expired (1 hour)
-  if (Date.now() - tokenData.createdAt > 60 * 60 * 1000) {
+
+  // Check if token has expired (5 minutes)
+  if (Date.now() - tokenData.createdAt > 5 * 60 * 1000) {
     csrfTokens.delete(token)
-    return res.status(403).json({ 
+    return res.status(403).json({
       message: 'CSRF token expired',
       code: 'CSRF_EXPIRED'
     })
   }
 
-  // Mark token as used (rotate it after use)
+  // Mark token as used (one-time use)
   csrfTokens.delete(token)
-  
+
   next()
 }
 

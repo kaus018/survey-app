@@ -6,12 +6,52 @@ import axios from "axios"
 const API_URL = "http://localhost:5001/api"
 
 export default function Profile() {
-  const { user, logout, token } = useAuth()
+  const { user, setUser, logout, token } = useAuth()
   const navigate = useNavigate()
   const [votedSurveys, setVotedSurveys] = useState([])
   const [createdSurveys, setCreatedSurveys] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedSurvey, setExpandedSurvey] = useState(null)
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [avatarUploadLoading, setAvatarUploadLoading] = useState(false)
+  const [avatarUploadError, setAvatarUploadError] = useState(null)
+
+  const handleAvatarChange = (e) => {
+    setAvatarFile(e.target.files[0])
+    setAvatarUploadError(null)
+  }
+
+  const handleAvatarUpload = async (e) => {
+    e.preventDefault()
+
+    if (!avatarFile) {
+      setAvatarUploadError('Выберите файл для загрузки')
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('avatar', avatarFile)
+
+    try {
+      setAvatarUploadLoading(true)
+      setAvatarUploadError(null)
+
+      const response = await axios.post(`${API_URL}/auth/upload-avatar`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      setUser((prev) => ({ ...prev, avatar: response.data.avatar }))
+      localStorage.setItem('user', JSON.stringify({ ...user, avatar: response.data.avatar }))
+      setAvatarFile(null)
+    } catch (error) {
+      setAvatarUploadError(error.response?.data?.message || 'Ошибка загрузки аватара')
+    } finally {
+      setAvatarUploadLoading(false)
+    }
+  }
 
   useEffect(() => {
     const fetchSurveys = async () => {
@@ -84,7 +124,11 @@ export default function Profile() {
   return (
     <main className="container profile-main">
       <article className="profile-header">
-        <img src="/images/Profile-PNG-File.png" alt="Profile" className="profile-avatar" />
+        <img
+          src={user?.avatar ? `http://localhost:5001${user.avatar}` : '/images/Profile-PNG-File.png'}
+          alt="Profile"
+          className="profile-avatar"
+        />
         <div className="profile-info">
           <h1>Никнейм: {user?.username || "Не заполнен"}</h1>
           <p>Электронная почта: {user?.email || "Не указана"}</p>
@@ -204,6 +248,17 @@ export default function Profile() {
           )}
         </>
       )}
+
+      <section className="avatar-upload-section" style={{ marginTop: '20px' }}>
+        <h2>Сменить аватар</h2>
+        <form onSubmit={handleAvatarUpload}>
+          <input type="file" accept="image/*" onChange={handleAvatarChange} />
+          <button type="submit" disabled={avatarUploadLoading} style={{ marginLeft: '10px' }}>
+            {avatarUploadLoading ? 'Загрузка...' : 'Загрузить'}
+          </button>
+        </form>
+        {avatarUploadError && <p style={{ color: 'red' }}>{avatarUploadError}</p>}
+      </section>
 
       <div className="profile-actions">
         <button onClick={handleLogout} className="logout-btn">Выйти</button>

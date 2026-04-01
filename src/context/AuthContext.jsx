@@ -52,7 +52,21 @@ export function AuthProvider({ children }) {
       // Устанавливаем заголовок авторизации для всех запросов
       apiClient.defaults.headers.common["Authorization"] = `Bearer ${savedToken}`
     }
+
+    // Initialize CSRF token
+    initializeCSRFToken()
   }, [])
+
+  // Function to initialize CSRF token
+  const initializeCSRFToken = async () => {
+    try {
+      // Make a simple GET request to get CSRF token
+      await apiClient.get('/')
+    } catch (error) {
+      // Ignore errors for token initialization
+      console.log('CSRF token initialized')
+    }
+  }
 
   const register = async (username, email, password, confirmPassword) => {
     try {

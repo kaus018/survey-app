@@ -14,6 +14,7 @@ export const generateCSRFToken = (req, res, next) => {
 
   // Return token in response header
   res.set('X-CSRF-Token', token)
+  console.log(`CSRF: Generated token for ${req.method} ${req.path}: ${token.substring(0, 8)}...`)
   next()
 }
 
@@ -25,8 +26,10 @@ export const verifyCSRFToken = (req, res, next) => {
   }
 
   const token = req.headers['x-csrf-token']
+  console.log(`CSRF: Verifying token for ${req.method} ${req.path}: ${token ? token.substring(0, 8) + '...' : 'MISSING'}`)
 
   if (!token) {
+    console.log('CSRF: Token missing')
     return res.status(403).json({
       message: 'CSRF token missing',
       code: 'CSRF_MISSING'
@@ -34,6 +37,7 @@ export const verifyCSRFToken = (req, res, next) => {
   }
 
   if (!csrfTokens.has(token)) {
+    console.log('CSRF: Token invalid or not found')
     return res.status(403).json({
       message: 'Invalid CSRF token',
       code: 'CSRF_INVALID'
@@ -51,8 +55,9 @@ export const verifyCSRFToken = (req, res, next) => {
     })
   }
 
-  // Mark token as used (one-time use)
-  csrfTokens.delete(token)
+  // Don't delete token after use - allow multiple uses within expiration time
+  // csrfTokens.delete(token)
+  console.log('CSRF: Token verified (multi-use)')
 
   next()
 }

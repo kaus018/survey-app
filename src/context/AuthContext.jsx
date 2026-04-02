@@ -5,6 +5,29 @@ import { validateEmail, isInputSafe } from "../utils/security"
 const AuthContext = createContext()
 
 const API_URL = "http://localhost:5001/api"
+const BACKEND_URL = "http://localhost:5001"
+
+// Create axios instance for CSRF token initialization
+const csrfClient = axios.create({
+  baseURL: BACKEND_URL,
+  withCredentials: true
+})
+
+// Interceptor to capture CSRF token from responses
+csrfClient.interceptors.response.use(
+  (response) => {
+    const csrfToken = response.headers['x-csrf-token']
+    if (csrfToken) {
+      sessionStorage.setItem('csrfToken', csrfToken)
+      console.log('✅ CSRF token received and saved')
+    }
+    return response
+  },
+  (error) => {
+    console.error('Error getting CSRF token:', error)
+    return Promise.reject(error)
+  }
+)
 
 // Create axios instance with CSRF token handling
 const apiClient = axios.create({
@@ -17,6 +40,8 @@ apiClient.interceptors.request.use((config) => {
   const csrfToken = sessionStorage.getItem('csrfToken')
   if (csrfToken) {
     config.headers['X-CSRF-Token'] = csrfToken
+  } else {
+    console.warn('⚠️ CSRF token not found in session storage')
   }
   return config
 })
@@ -60,11 +85,20 @@ export function AuthProvider({ children }) {
   // Function to initialize CSRF token
   const initializeCSRFToken = async () => {
     try {
-      // Make a simple GET request to get CSRF token
-      await apiClient.get('/')
+      console.log('🔄 Initializing CSRF token...')
+      // Make a GET request to the auth token endpoint to get CSRF token
+      const response = await csrfClient.get('/api/auth/token')
+      console.log('✅ CSRF token initialization response received')
+      
+      // Double check it's in session storage
+      const token = sessionStorage.getItem('csrfToken')
+      if (token) {
+        console.log(`✅ CSRF token stored: ${token.substring(0, 8)}...`)
+      } else {
+        console.warn('⚠️ CSRF token not found in sessionStorage after initialization')
+      }
     } catch (error) {
-      // Ignore errors for token initialization
-      console.log('CSRF token initialized')
+      console.error('❌ Error initializing CSRF token:', error.message)
     }
   }
 

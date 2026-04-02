@@ -14,7 +14,7 @@ export const generateCSRFToken = (req, res, next) => {
 
   // Return token in response header
   res.set('X-CSRF-Token', token)
-  console.log(`CSRF: Generated token for ${req.method} ${req.path}: ${token.substring(0, 8)}...`)
+  console.log(`[CSRF] 🔑 Generated token for ${req.method} ${req.path}: ${token.substring(0, 8)}... (Total: ${csrfTokens.size})`)
   next()
 }
 
@@ -25,11 +25,19 @@ export const verifyCSRFToken = (req, res, next) => {
     return next()
   }
 
+  // Skip CSRF check for auth endpoints (first request without token)
+  if (req.path === '/api/auth/login' || req.path === '/api/auth/register') {
+    console.log(`[CSRF] ⏭️ Skipping CSRF check for ${req.method} ${req.path}`)
+    return next()
+  }
+
   const token = req.headers['x-csrf-token']
-  console.log(`CSRF: Verifying token for ${req.method} ${req.path}: ${token ? token.substring(0, 8) + '...' : 'MISSING'}`)
+  console.log(`[CSRF] 🔍 Verifying token for ${req.method} ${req.path}`)
+  console.log(`[CSRF] Token received: ${token ? token.substring(0, 8) + '...' : 'MISSING'}`)
+  console.log(`[CSRF] Valid tokens in storage: ${csrfTokens.size}`)
 
   if (!token) {
-    console.log('CSRF: Token missing')
+    console.log(`[CSRF] ❌ CSRF token missing for ${req.method} ${req.path}`)
     return res.status(403).json({
       message: 'CSRF token missing',
       code: 'CSRF_MISSING'
@@ -37,7 +45,8 @@ export const verifyCSRFToken = (req, res, next) => {
   }
 
   if (!csrfTokens.has(token)) {
-    console.log('CSRF: Token invalid or not found')
+    console.log(`[CSRF] ❌ Invalid CSRF token for ${req.method} ${req.path}`)
+    console.log(`[CSRF] Available tokens: ${Array.from(csrfTokens.keys()).map(t => t.substring(0, 8) + '...').join(', ')}`)
     return res.status(403).json({
       message: 'Invalid CSRF token',
       code: 'CSRF_INVALID'
@@ -49,6 +58,7 @@ export const verifyCSRFToken = (req, res, next) => {
   // Check if token has expired (5 minutes)
   if (Date.now() - tokenData.createdAt > 5 * 60 * 1000) {
     csrfTokens.delete(token)
+    console.log(`[CSRF] ❌ Token expired for ${req.method} ${req.path}`)
     return res.status(403).json({
       message: 'CSRF token expired',
       code: 'CSRF_EXPIRED'
@@ -56,9 +66,8 @@ export const verifyCSRFToken = (req, res, next) => {
   }
 
   // Don't delete token after use - allow multiple uses within expiration time
-  // csrfTokens.delete(token)
-  console.log('CSRF: Token verified (multi-use)')
 
+  console.log(`[CSRF] ✅ Token verified for ${req.method} ${req.path}`)
   next()
 }
 

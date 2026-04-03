@@ -44,7 +44,10 @@ const upload = multer({
 
 // Public routes - get CSRF token
 router.get('/token', (req, res) => {
-  res.json({ message: 'CSRF token sent in X-CSRF-Token header' })
+  res.json({
+    message: 'CSRF token generated successfully',
+    token: res.locals.csrfToken || null
+  })
 })
 
 // Public routes with validation

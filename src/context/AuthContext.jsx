@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useState, useEffect, useRef } from "react"
 import axios from "axios"
 import { validateEmail, isInputSafe } from "../utils/security"
 
@@ -16,7 +16,7 @@ const csrfClient = axios.create({
 // Interceptor to capture CSRF token from responses
 csrfClient.interceptors.response.use(
   (response) => {
-    const csrfToken = response.headers['x-csrf-token']
+    const csrfToken = response.headers['x-csrf-token'] || response.data?.token
     if (csrfToken) {
       sessionStorage.setItem('csrfToken', csrfToken)
       console.log('✅ CSRF token received and saved')
@@ -49,7 +49,7 @@ apiClient.interceptors.request.use((config) => {
 // Interceptor to capture CSRF token from responses
 apiClient.interceptors.response.use(
   (response) => {
-    const csrfToken = response.headers['x-csrf-token']
+    const csrfToken = response.headers['x-csrf-token'] || response.data?.token
     if (csrfToken) {
       sessionStorage.setItem('csrfToken', csrfToken)
     }
@@ -65,6 +65,7 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const csrfInitializedRef = useRef(false)
 
   // Загружаем токен при монтировании
   useEffect(() => {
@@ -79,7 +80,10 @@ export function AuthProvider({ children }) {
     }
 
     // Initialize CSRF token
-    initializeCSRFToken()
+    if (!csrfInitializedRef.current) {
+      csrfInitializedRef.current = true
+      initializeCSRFToken()
+    }
   }, [])
 
   // Function to initialize CSRF token
@@ -87,7 +91,7 @@ export function AuthProvider({ children }) {
     try {
       console.log('🔄 Initializing CSRF token...')
       // Make a GET request to the auth token endpoint to get CSRF token
-      const response = await csrfClient.get('/api/auth/token')
+      await csrfClient.get('/api/auth/token')
       console.log('✅ CSRF token initialization response received')
       
       // Double check it's in session storage

@@ -3,6 +3,12 @@ import { useState, useEffect } from "react"
 import { useAuth } from "../context/AuthContext"
 
 const getQuestionId = (question, index) => String(question._id || index)
+const formatDiscussionDate = (value) => new Date(value).toLocaleString("ru-RU", {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit"
+})
 
 export default function SurveyDetails() {
   const { id } = useParams()
@@ -26,8 +32,16 @@ export default function SurveyDetails() {
   })
   const [saveLoading, setSaveLoading] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [commentText, setCommentText] = useState("")
+  const [commentLoading, setCommentLoading] = useState(false)
+  const [replyingTo, setReplyingTo] = useState(null)
+  const [replyDrafts, setReplyDrafts] = useState({})
+  const [replyLoadingId, setReplyLoadingId] = useState(null)
 
   const isAuthor = Boolean(user && survey?.author && (survey.author._id === user.id || survey.author === user.id))
+  const discussionComments = [...(survey?.comments || [])].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+  )
 
   useEffect(() => {
     const fetchSurvey = async () => {
@@ -213,6 +227,59 @@ export default function SurveyDetails() {
       alert(err.response?.data?.message || "Не удалось удалить опрос")
     } finally {
       setDeleteLoading(false)
+    }
+  }
+
+  const handleAddComment = async (e) => {
+    e.preventDefault()
+
+    if (!token || !user) {
+      alert("Войдите в аккаунт, чтобы участвовать в обсуждении")
+      navigate("/login")
+      return
+    }
+
+    const text = commentText.trim()
+
+    if (!text) {
+      return
+    }
+
+    try {
+      setCommentLoading(true)
+      const response = await apiClient.post(`/surveys/${id}/comments`, { text })
+      setSurvey((prev) => ({ ...prev, comments: response.data.comments }))
+      setCommentText("")
+    } catch (err) {
+      alert(err.response?.data?.message || "Не удалось отправить комментарий")
+    } finally {
+      setCommentLoading(false)
+    }
+  }
+
+  const handleAddReply = async (commentId) => {
+    if (!token || !user) {
+      alert("Войдите в аккаунт, чтобы отвечать в обсуждении")
+      navigate("/login")
+      return
+    }
+
+    const text = String(replyDrafts[commentId] || "").trim()
+
+    if (!text) {
+      return
+    }
+
+    try {
+      setReplyLoadingId(commentId)
+      const response = await apiClient.post(`/surveys/${id}/comments/${commentId}/replies`, { text })
+      setSurvey((prev) => ({ ...prev, comments: response.data.comments }))
+      setReplyDrafts((prev) => ({ ...prev, [commentId]: "" }))
+      setReplyingTo(null)
+    } catch (err) {
+      alert(err.response?.data?.message || "Не удалось отправить ответ")
+    } finally {
+      setReplyLoadingId(null)
     }
   }
 
@@ -507,6 +574,134 @@ export default function SurveyDetails() {
             ) : (
               <p style={{ color: "green" }}>Спасибо за ваш ответ!</p>
             )}
+
+            <section className="discussion-panel">
+              <div className="discussion-header">
+                <div>
+                  <h3>Обсуждение</h3>
+                  <p className="discussion-subtitle">
+                    Формат как в социальных сетях: делитесь мнением и отвечайте друг другу.
+                  </p>
+                </div>
+                <div className="discussion-count">
+                  {discussionComments.length} комментариев
+                </div>
+              </div>
+
+              <form onSubmit={handleAddComment} className="discussion-composer">
+                <textarea
+                  rows="3"
+                  placeholder="Напишите, что думаете об этом опросе..."
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                />
+                <div className="discussion-composer-actions">
+                  <button type="submit" className="primary-action-btn" disabled={commentLoading}>
+                    {commentLoading ? "Публикация..." : "Опубликовать"}
+                  </button>
+                </div>
+              </form>
+
+              <div className="discussion-feed">
+                {discussionComments.length > 0 ? (
+                  discussionComments.map((comment) => (
+                    <article key={comment._id} className="thread-card">
+                      <div className="thread-avatar">
+                        {comment.user?.avatar ? (
+                          <img
+                            src={`http://localhost:5001${comment.user.avatar}`}
+                            alt={comment.user?.username || "User"}
+                          />
+                        ) : (
+                          <span>{(comment.user?.username || "U").charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+
+                      <div className="thread-body">
+                        <div className="thread-meta">
+                          <strong>{comment.user?.username || "Пользователь"}</strong>
+                          <span>{formatDiscussionDate(comment.createdAt)}</span>
+                        </div>
+
+                        <p className="thread-text">{comment.text}</p>
+
+                        <div className="thread-actions">
+                          <button
+                            type="button"
+                            className="thread-reply-btn"
+                            onClick={() => setReplyingTo(replyingTo === comment._id ? null : comment._id)}
+                          >
+                            Ответить
+                          </button>
+                        </div>
+
+                        {replyingTo === comment._id && (
+                          <div className="thread-reply-editor">
+                            <textarea
+                              rows="2"
+                              placeholder="Напишите ответ..."
+                              value={replyDrafts[comment._id] || ""}
+                              onChange={(e) =>
+                                setReplyDrafts((prev) => ({ ...prev, [comment._id]: e.target.value }))
+                              }
+                            />
+                            <div className="discussion-composer-actions">
+                              <button
+                                type="button"
+                                className="secondary-action-btn"
+                                onClick={() => setReplyingTo(null)}
+                              >
+                                Отмена
+                              </button>
+                              <button
+                                type="button"
+                                className="primary-action-btn"
+                                onClick={() => handleAddReply(comment._id)}
+                                disabled={replyLoadingId === comment._id}
+                              >
+                                {replyLoadingId === comment._id ? "Отправка..." : "Ответить"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {comment.replies?.length > 0 && (
+                          <div className="thread-replies">
+                            {[...comment.replies]
+                              .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+                              .map((reply) => (
+                                <div key={reply._id} className="thread-reply-item">
+                                  <div className="thread-reply-avatar">
+                                    {reply.user?.avatar ? (
+                                      <img
+                                        src={`http://localhost:5001${reply.user.avatar}`}
+                                        alt={reply.user?.username || "User"}
+                                      />
+                                    ) : (
+                                      <span>{(reply.user?.username || "U").charAt(0).toUpperCase()}</span>
+                                    )}
+                                  </div>
+                                  <div className="thread-reply-content">
+                                    <div className="thread-meta">
+                                      <strong>{reply.user?.username || "Пользователь"}</strong>
+                                      <span>{formatDiscussionDate(reply.createdAt)}</span>
+                                    </div>
+                                    <p className="thread-text">{reply.text}</p>
+                                  </div>
+                                </div>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <div className="discussion-empty">
+                    Пока обсуждения нет. Станьте первым участником разговора.
+                  </div>
+                )}
+              </div>
+            </section>
           </>
         )}
       </section>

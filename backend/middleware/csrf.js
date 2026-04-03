@@ -13,6 +13,7 @@ export const generateCSRFToken = (req, res, next) => {
   })
 
   // Return token in response header
+  res.locals.csrfToken = token
   res.set('X-CSRF-Token', token)
   console.log(`[CSRF] 🔑 Generated token for ${req.method} ${req.path}: ${token.substring(0, 8)}... (Total: ${csrfTokens.size})`)
   next()

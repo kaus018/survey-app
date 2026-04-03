@@ -1,6 +1,13 @@
 import Survey from '../models/Survey.js'
 import Response from '../models/Response.js'
 
+const surveyPopulateConfig = [
+  { path: 'author', select: 'username email avatar' },
+  { path: 'responses.user', select: 'username email avatar' },
+  { path: 'comments.user', select: 'username email avatar' },
+  { path: 'comments.replies.user', select: 'username email avatar' }
+]
+
 const formatPercent = (value, total) => {
   if (!total) return 0
   return Number(((value / total) * 100).toFixed(1))
@@ -117,9 +124,7 @@ const buildQuestionStatistics = (survey, responses) => {
 
 export const getAllSurveys = async (req, res) => {
   try {
-    const surveys = await Survey.find()
-      .populate('author', 'username email avatar')
-      .populate('responses.user', 'username email')
+    const surveys = await Survey.find().populate(surveyPopulateConfig)
 
     res.status(200).json({
       message: 'Surveys retrieved',
@@ -134,8 +139,7 @@ export const getAllSurveys = async (req, res) => {
 export const getSurveyById = async (req, res) => {
   try {
     const survey = await Survey.findById(req.params.id)
-      .populate('author', 'username email avatar')
-      .populate('responses.user', 'username email')
+      .populate(surveyPopulateConfig)
 
     if (!survey) {
       return res.status(404).json({ message: 'Survey not found' })
@@ -170,7 +174,7 @@ export const createSurvey = async (req, res) => {
     })
 
     await survey.save()
-    await survey.populate('author', 'username email avatar')
+    await survey.populate(surveyPopulateConfig)
 
     res.status(201).json({
       message: 'Survey created successfully',
@@ -201,7 +205,7 @@ export const updateSurvey = async (req, res) => {
     if (typeof isActive !== 'undefined') survey.isActive = isActive
 
     await survey.save()
-    await survey.populate('author', 'username email avatar')
+    await survey.populate(surveyPopulateConfig)
 
     res.status(200).json({
       message: 'Survey updated successfully',
@@ -328,6 +332,74 @@ export const getUserResponses = async (req, res) => {
     })
   } catch {
     res.status(500).json({ message: 'Server error' })
+  }
+}
+
+export const addSurveyComment = async (req, res) => {
+  try {
+    const survey = await Survey.findById(req.params.id)
+
+    if (!survey) {
+      return res.status(404).json({ message: 'Survey not found' })
+    }
+
+    const text = String(req.body?.text || '').trim()
+
+    if (!text) {
+      return res.status(400).json({ message: 'Comment text is required' })
+    }
+
+    survey.comments.push({
+      user: req.userId,
+      text
+    })
+
+    await survey.save()
+    await survey.populate(surveyPopulateConfig)
+
+    res.status(201).json({
+      message: 'Comment added successfully',
+      comments: survey.comments
+    })
+  } catch {
+    res.status(500).json({ message: 'Server error adding comment' })
+  }
+}
+
+export const addSurveyCommentReply = async (req, res) => {
+  try {
+    const survey = await Survey.findById(req.params.id)
+
+    if (!survey) {
+      return res.status(404).json({ message: 'Survey not found' })
+    }
+
+    const comment = survey.comments.id(req.params.commentId)
+
+    if (!comment) {
+      return res.status(404).json({ message: 'Comment not found' })
+    }
+
+    const text = String(req.body?.text || '').trim()
+
+    if (!text) {
+      return res.status(400).json({ message: 'Reply text is required' })
+    }
+
+    comment.replies.push({
+      user: req.userId,
+      text
+    })
+
+    await survey.save()
+    await survey.populate(surveyPopulateConfig)
+
+    res.status(201).json({
+      message: 'Reply added successfully',
+      comments: survey.comments
+    })
+  } catch {
+    res.status(500).json({ message: 'Server error adding reply' })
   }
 }
 

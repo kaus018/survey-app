@@ -1,5 +1,48 @@
 import mongoose from 'mongoose'
 
+const replySchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    text: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 1000
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  },
+  { _id: true }
+)
+
+const commentSchema = new mongoose.Schema(
+  {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    text: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 1000
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    replies: [replySchema]
+  },
+  { _id: true }
+)
+
 const surveySchema = new mongoose.Schema(
   {
     title: {
@@ -42,6 +85,7 @@ const surveySchema = new mongoose.Schema(
         }
       }
     ],
+    comments: [commentSchema],
     isActive: {
       type: Boolean,
       default: true

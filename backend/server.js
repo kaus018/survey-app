@@ -41,7 +41,8 @@ app.use(helmet({
   frameguard: { action: 'deny' },              // Prevent clickjacking
   xssFilter: true,                              // Enable XSS filtering
   noSniff: true,                                // Prevent MIME type sniffing
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
 }))
 
 // Security logging
@@ -65,14 +66,48 @@ const authLimiter = rateLimit({
 
 app.use(generalLimiter) // Применяем к всем запросам
 
+const isAllowedDevOrigin = (origin) => {
+  if (!origin) return true
+
+  const allowedDevOrigins = [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'http://localhost:5175',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:5174',
+    'http://127.0.0.1:5175'
+  ]
+
+  if (allowedDevOrigins.includes(origin)) {
+    return true
+  }
+
+  return /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
+}
+
 // CORS configuration with security best practices
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? ['https://yourdomain.com'] 
-    : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174'],
+  origin: (origin, callback) => {
+    if (process.env.NODE_ENV === 'production') {
+      const allowedOrigins = ['https://yourdomain.com']
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true)
+      }
+      return callback(new Error(`Origin ${origin} is not allowed by CORS`))
+    }
+
+    if (isAllowedDevOrigin(origin)) {
+      return callback(null, true)
+    }
+
+    return callback(new Error(`Origin ${origin} is not allowed by CORS`))
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
+  exposedHeaders: ['X-CSRF-Token'],
   maxAge: 86400 // 24 hours
 }))
 

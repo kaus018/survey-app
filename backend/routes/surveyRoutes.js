@@ -8,7 +8,9 @@ import {
   respondToSurvey,
   getSurveyResponses,
   getUserResponses,
-  getSurveyStatistics
+  getSurveyStatistics,
+  addSurveyComment,
+  addSurveyCommentReply
 } from '../controllers/surveyController.js'
 import { protect } from '../middleware/auth.js'
 
@@ -28,6 +30,8 @@ router.post('/', protect, createSurvey)
 router.put('/:id', protect, updateSurvey)
 router.delete('/:id', protect, deleteSurvey)
 router.post('/:id/respond', protect, respondToSurvey)
+router.post('/:id/comments', protect, addSurveyComment)
+router.post('/:id/comments/:commentId/replies', protect, addSurveyCommentReply)
 router.get('/:id/responses', protect, getSurveyResponses)
 router.get('/:id/statistics', protect, getSurveyStatistics)
 

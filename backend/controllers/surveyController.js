@@ -1,10 +1,124 @@
 import Survey from '../models/Survey.js'
 import Response from '../models/Response.js'
 
+const formatPercent = (value, total) => {
+  if (!total) return 0
+  return Number(((value / total) * 100).toFixed(1))
+}
+
+const buildQuestionStatistics = (survey, responses) => {
+  return survey.questions.map((question, index) => {
+    const questionId = String(question._id || index)
+    const questionAnswers = responses
+      .map((response) => response.answers?.[questionId])
+      .filter((answer) => typeof answer !== 'undefined' && answer !== null && answer !== '')
+
+    const totalAnswers = questionAnswers.length
+
+    if (question.type === 'rating') {
+      const distribution = {}
+
+      for (const answer of questionAnswers) {
+        const answerKey = String(answer)
+        distribution[answerKey] = (distribution[answerKey] || 0) + 1
+      }
+
+      const options = Object.entries(distribution)
+        .sort((a, b) => Number(a[0]) - Number(b[0]))
+        .map(([value, count]) => ({
+          value,
+          count,
+          percent: formatPercent(count, totalAnswers)
+        }))
+
+      const average = totalAnswers
+        ? Number((questionAnswers.reduce((sum, answer) => sum + Number(answer), 0) / totalAnswers).toFixed(2))
+        : 0
+
+      const topAnswer = options.reduce((best, option) => {
+        if (!best || option.count > best.count) return option
+        return best
+      }, null)
+
+      return {
+        questionId,
+        questionText: question.text,
+        questionType: question.type,
+        totalAnswers,
+        average,
+        topAnswer,
+        options
+      }
+    }
+
+    if (question.type === 'choice') {
+      const distribution = {}
+
+      for (const option of question.options || []) {
+        distribution[option] = 0
+      }
+
+      for (const answer of questionAnswers) {
+        const answerKey = String(answer)
+        distribution[answerKey] = (distribution[answerKey] || 0) + 1
+      }
+
+      const options = Object.entries(distribution).map(([value, count]) => ({
+        value,
+        count,
+        percent: formatPercent(count, totalAnswers)
+      }))
+
+      const topAnswer = options.reduce((best, option) => {
+        if (!best || option.count > best.count) return option
+        return best
+      }, null)
+
+      return {
+        questionId,
+        questionText: question.text,
+        questionType: question.type,
+        totalAnswers,
+        topAnswer,
+        options
+      }
+    }
+
+    const normalizedAnswers = questionAnswers
+      .map((answer) => String(answer).trim())
+      .filter(Boolean)
+
+    const distribution = {}
+
+    for (const answer of normalizedAnswers) {
+      distribution[answer] = (distribution[answer] || 0) + 1
+    }
+
+    const topResponses = Object.entries(distribution)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([value, count]) => ({
+        value,
+        count,
+        percent: formatPercent(count, normalizedAnswers.length)
+      }))
+
+    return {
+      questionId,
+      questionText: question.text,
+      questionType: question.type,
+      totalAnswers,
+      topAnswer: topResponses[0] || null,
+      textAnswers: normalizedAnswers,
+      topResponses
+    }
+  })
+}
+
 export const getAllSurveys = async (req, res) => {
   try {
     const surveys = await Survey.find()
-      .populate('author', 'username email')
+      .populate('author', 'username email avatar')
       .populate('responses.user', 'username email')
 
     res.status(200).json({
@@ -12,7 +126,7 @@ export const getAllSurveys = async (req, res) => {
       surveys,
       count: surveys.length
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Server error' })
   }
 }
@@ -20,7 +134,7 @@ export const getAllSurveys = async (req, res) => {
 export const getSurveyById = async (req, res) => {
   try {
     const survey = await Survey.findById(req.params.id)
-      .populate('author', 'username email')
+      .populate('author', 'username email avatar')
       .populate('responses.user', 'username email')
 
     if (!survey) {
@@ -31,7 +145,7 @@ export const getSurveyById = async (req, res) => {
       message: 'Survey retrieved',
       survey
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Server error' })
   }
 }
@@ -49,27 +163,27 @@ export const createSurvey = async (req, res) => {
     }
 
     const survey = new Survey({
-      title,
+      title: title.trim(),
       description,
       questions: questions || [],
       author: req.userId
     })
 
     await survey.save()
-    await survey.populate('author', 'username email')
+    await survey.populate('author', 'username email avatar')
 
     res.status(201).json({
       message: 'Survey created successfully',
       survey
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Server error creating survey' })
   }
 }
 
 export const updateSurvey = async (req, res) => {
   try {
-    let survey = await Survey.findById(req.params.id)
+    const survey = await Survey.findById(req.params.id)
 
     if (!survey) {
       return res.status(404).json({ message: 'Survey not found' })
@@ -81,19 +195,19 @@ export const updateSurvey = async (req, res) => {
 
     const { title, description, questions, isActive } = req.body
 
-    if (title) survey.title = title
-    if (description) survey.description = description
-    if (questions) survey.questions = questions
+    if (typeof title === 'string' && title.trim()) survey.title = title.trim()
+    if (typeof description !== 'undefined') survey.description = description
+    if (Array.isArray(questions)) survey.questions = questions
     if (typeof isActive !== 'undefined') survey.isActive = isActive
 
     await survey.save()
-    await survey.populate('author', 'username email')
+    await survey.populate('author', 'username email avatar')
 
     res.status(200).json({
       message: 'Survey updated successfully',
       survey
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Server error updating survey' })
   }
 }
@@ -111,11 +225,12 @@ export const deleteSurvey = async (req, res) => {
     }
 
     await Survey.findByIdAndDelete(req.params.id)
+    await Response.deleteMany({ survey: req.params.id })
 
     res.status(200).json({
       message: 'Survey deleted successfully'
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Server error deleting survey' })
   }
 }
@@ -158,11 +273,18 @@ export const respondToSurvey = async (req, res) => {
     await response.save()
     await response.populate('user', 'username email')
 
+    survey.responses.push({
+      user: req.userId,
+      answers,
+      submittedAt: response.submittedAt
+    })
+    await survey.save()
+
     res.status(200).json({
       message: 'Thank you for your response!',
       response
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Server error sending response' })
   }
 }
@@ -188,7 +310,7 @@ export const getSurveyResponses = async (req, res) => {
       responses,
       count: responses.length
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Server error' })
   }
 }
@@ -196,7 +318,7 @@ export const getSurveyResponses = async (req, res) => {
 export const getUserResponses = async (req, res) => {
   try {
     const responses = await Response.find({ user: req.userId })
-      .populate('survey', 'title description')
+      .populate('survey', 'title description questions isActive author')
       .sort({ submittedAt: -1 })
 
     res.status(200).json({
@@ -204,7 +326,7 @@ export const getUserResponses = async (req, res) => {
       responses,
       count: responses.length
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Server error' })
   }
 }
@@ -224,26 +346,17 @@ export const getSurveyStatistics = async (req, res) => {
     const responses = await Response.find({ survey: req.params.id })
       .populate('user', 'username email')
 
+    const questionStats = buildQuestionStatistics(survey, responses)
+
     const statistics = {
       totalResponses: responses.length,
       responses,
-      answerDistribution: {},
-      respondents: responses.map(r => ({
-        username: r.user.username,
-        email: r.user.email,
-        submittedAt: r.submittedAt
+      questionStats,
+      respondents: responses.map((response) => ({
+        username: response.user.username,
+        email: response.user.email,
+        submittedAt: response.submittedAt
       }))
-    }
-
-    for (const response of responses) {
-      for (const [questionId, answer] of Object.entries(response.answers)) {
-        if (!statistics.answerDistribution[questionId]) {
-          statistics.answerDistribution[questionId] = {}
-        }
-        const answerStr = String(answer)
-        statistics.answerDistribution[questionId][answerStr] = 
-          (statistics.answerDistribution[questionId][answerStr] || 0) + 1
-      }
     }
 
     res.status(200).json({
@@ -256,7 +369,7 @@ export const getSurveyStatistics = async (req, res) => {
       },
       statistics
     })
-  } catch (error) {
+  } catch {
     res.status(500).json({ message: 'Server error' })
   }
 }

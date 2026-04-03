@@ -1,12 +1,10 @@
 import { useAuth } from "../context/AuthContext"
 import { useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react"
-import axios from "axios"
-
-const API_URL = "http://localhost:5001/api"
+const BACKEND_URL = "http://localhost:5001"
 
 export default function Profile() {
-  const { user, setUser, logout, token } = useAuth()
+  const { user, setUser, logout, token, apiClient } = useAuth()
   const navigate = useNavigate()
   const [votedSurveys, setVotedSurveys] = useState([])
   const [createdSurveys, setCreatedSurveys] = useState([])
@@ -36,15 +34,15 @@ export default function Profile() {
       setAvatarUploadLoading(true)
       setAvatarUploadError(null)
 
-      const response = await axios.post(`${API_URL}/auth/upload-avatar`, formData, {
+      const response = await apiClient.post("/auth/upload-avatar", formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`
+          'Content-Type': 'multipart/form-data'
         }
       })
 
-      setUser((prev) => ({ ...prev, avatar: response.data.avatar }))
-      localStorage.setItem('user', JSON.stringify({ ...user, avatar: response.data.avatar }))
+      const nextUser = { ...user, avatar: response.data.avatar }
+      setUser(nextUser)
+      localStorage.setItem('user', JSON.stringify(nextUser))
       setAvatarFile(null)
     } catch (error) {
       setAvatarUploadError(error.response?.data?.message || 'Ошибка загрузки аватара')
@@ -57,42 +55,38 @@ export default function Profile() {
     const fetchSurveys = async () => {
       try {
         setLoading(true)
-        const response = await axios.get(`${API_URL}/surveys`)
+        const [surveyResponse, userResponsesResponse] = await Promise.all([
+          apiClient.get("/surveys"),
+          apiClient.get("/surveys/user/responses")
+        ])
         
         // Опросы которые пользователь создал
-        const created = response.data.surveys.filter(s => 
+        const created = surveyResponse.data.surveys.filter(s => 
           s.author._id === user.id || s.author === user.id
         )
-        
-        // Опросы на которые пользователь ответил
-        const voted = response.data.surveys.filter(survey =>
-          survey.responses.some(resp => {
-            const respUserId = typeof resp.user === 'object' ? resp.user._id : resp.user
-            return respUserId === user.id || respUserId.toString() === user.id || respUserId._id === user.id
-          })
-        )
-        
+
+        const voted = userResponsesResponse.data.responses.map((response) => ({
+          ...response.survey,
+          userResponse: response
+        }))
+
         setCreatedSurveys(created)
         setVotedSurveys(voted)
-      } catch (error) {
+      } catch {
         // Ошибка при загрузке опросов
       } finally {
         setLoading(false)
       }
     }
 
-    if (user && token) {
+    if (user && token && apiClient) {
       fetchSurveys()
     }
-  }, [user, token])
+  }, [user, token, apiClient])
 
   // Получить ответы пользователя для конкретного опроса
   const getUserAnswers = (survey) => {
-    const userResponse = survey.responses.find(resp => {
-      const respUserId = typeof resp.user === 'object' ? resp.user._id : resp.user
-      return respUserId === user.id || respUserId.toString() === user.id
-    })
-    return userResponse ? userResponse.answers : null
+    return survey.userResponse?.answers || null
   }
 
   // Получить текст вопроса по ID
@@ -125,7 +119,7 @@ export default function Profile() {
     <main className="container profile-main">
       <article className="profile-header">
         <img
-          src={user?.avatar ? `http://localhost:5001${user.avatar}` : '/images/Profile-PNG-File.png'}
+          src={user?.avatar ? `${BACKEND_URL}${user.avatar}` : '/images/Profile-PNG-File.png'}
           alt="Profile"
           className="profile-avatar"
         />
@@ -251,7 +245,7 @@ export default function Profile() {
 
       <section className="avatar-upload-section" style={{ marginTop: '20px' }}>
         <h2>Сменить аватар</h2>
-        <form onSubmit={handleAvatarUpload}>
+        <form onSubmit={handleAvatarUpload} className="avatar-upload-form">
           <input type="file" accept="image/*" onChange={handleAvatarChange} />
           <button type="submit" disabled={avatarUploadLoading} style={{ marginLeft: '10px' }}>
             {avatarUploadLoading ? 'Загрузка...' : 'Загрузить'}

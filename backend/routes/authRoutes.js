@@ -1,6 +1,8 @@
 import express from 'express'
 import multer from 'multer'
 import path from 'path'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 import { register, login, getProfile, uploadAvatar } from '../controllers/authController.js'
 import { protect } from '../middleware/auth.js'
 import { 
@@ -10,11 +12,18 @@ import {
 } from '../middleware/validation.js'
 
 const router = express.Router()
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const uploadsDir = path.resolve(__dirname, '../uploads')
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true })
+}
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/')
+    cb(null, uploadsDir)
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + path.extname(file.originalname))

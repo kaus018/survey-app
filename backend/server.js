@@ -4,6 +4,9 @@ import dotenv from 'dotenv'
 import helmet from 'helmet'
 import mongoSanitize from 'mongodb-sanitize'
 import rateLimit from 'express-rate-limit'
+import path from 'path'
+import fs from 'fs'
+import { fileURLToPath } from 'url'
 import connectDB from './config/db.js'
 import authRoutes from './routes/authRoutes.js'
 import surveyRoutes from './routes/surveyRoutes.js'
@@ -13,6 +16,14 @@ import { securityLogger, logSuspiciousInput } from './middleware/security.js'
 dotenv.config({ path: './.env' })
 console.log('MONGO_URI:', process.env.MONGO_URI)
 connectDB()
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const uploadsDir = path.resolve(__dirname, 'uploads')
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true })
+}
 
 const app = express()
 
@@ -69,7 +80,7 @@ app.use(cors({
 app.use(express.json({ limit: '10kb' }))
 
 // Serve static files from uploads directory
-app.use('/uploads', express.static('uploads'))
+app.use('/uploads', express.static(uploadsDir))
 
 // Sanitize request body from NoSQL injection
 app.use(mongoSanitize())

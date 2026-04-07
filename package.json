@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "start": "vite preview --host 0.0.0.0 --port ${PORT:-4173}",
+    "build": "npm install --prefix backend && vite build",
+    "start": "node backend/server.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },

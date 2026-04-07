@@ -13,12 +13,13 @@ import surveyRoutes from './routes/surveyRoutes.js'
 import { generateCSRFToken, verifyCSRFToken } from './middleware/csrf.js'
 import { securityLogger, logSuspiciousInput } from './middleware/security.js'
 
-dotenv.config({ path: './.env' })
-connectDB()
-
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const uploadsDir = path.resolve(__dirname, 'uploads')
+const frontendDistDir = path.resolve(__dirname, '../dist')
+
+dotenv.config({ path: path.resolve(__dirname, '.env') })
+connectDB()
 
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true })
@@ -98,6 +99,10 @@ app.use(cors({
       return callback(null, true)
     }
 
+    if (allowedOrigins.length === 0) {
+      return callback(null, true)
+    }
+
     if (allowedOrigins.includes(origin) || isAllowedDevOrigin(origin)) {
       return callback(null, true)
     }
@@ -137,27 +142,27 @@ app.use('/api/auth/register', authLimiter)
 app.use('/api/auth', authRoutes)
 app.use('/api/surveys', surveyRoutes)
 
+if (fs.existsSync(frontendDistDir)) {
+  app.use(express.static(frontendDistDir))
+}
+
 app.get('/', (req, res) => {
+  if (fs.existsSync(frontendDistDir)) {
+    return res.sendFile(path.join(frontendDistDir, 'index.html'))
+  }
+
   res.json({
     message: 'Survey App API',
-    version: '1.0.0',
-    endpoints: {
-      auth: {
-        register: 'POST /api/auth/register',
-        login: 'POST /api/auth/login',
-        profile: 'GET /api/auth/profile'
-      },
-      surveys: {
-        getAll: 'GET /api/surveys',
-        getOne: 'GET /api/surveys/:id',
-        create: 'POST /api/surveys',
-        update: 'PUT /api/surveys/:id',
-        delete: 'DELETE /api/surveys/:id',
-        respond: 'POST /api/surveys/:id/respond',
-        getResponses: 'GET /api/surveys/:id/responses'
-      }
-    }
+    version: '1.0.0'
   })
+})
+
+app.get(/^\/(?!api).*/, (req, res, next) => {
+  if (!fs.existsSync(frontendDistDir)) {
+    return next()
+  }
+
+  res.sendFile(path.join(frontendDistDir, 'index.html'))
 })
 
 app.use((req, res) => {

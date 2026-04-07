@@ -13,6 +13,13 @@ export default defineConfig({
     //   },
     // },
   },
+  preview: {
+    host: '0.0.0.0',
+    allowedHosts: [
+      'survey-app-8h2c.onrender.com',
+      '.onrender.com'
+    ]
+  },
   build: {
     // Настройки сборки (оптимизация, минификация и т.д.)
   },

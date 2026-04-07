@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm install --prefix backend && vite build",
+    "build:frontend": "vite build",
+    "build": "npm install && npm install --prefix backend && npm run build:frontend",
     "start": "node backend/server.js",
     "lint": "eslint .",
     "preview": "vite preview"

@@ -17,6 +17,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const uploadsDir = path.resolve(__dirname, 'uploads')
 const frontendDistDir = path.resolve(__dirname, '../dist')
+const frontendAssetsDir = path.join(frontendDistDir, 'assets')
+const frontendImagesDir = path.join(frontendDistDir, 'images')
 
 dotenv.config({ path: path.resolve(__dirname, '.env') })
 connectDB()
@@ -26,6 +28,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 const app = express()
+const hasFrontendBuild = fs.existsSync(frontendDistDir)
 
 // Security Middleware
 // Helmet helps secure Express apps by setting various HTTP headers
@@ -120,8 +123,18 @@ app.use(cors({
 // Limit request body size
 app.use(express.json({ limit: '10kb' }))
 
-// Serve static files from uploads directory
+// Serve static files before API/security middleware touches asset requests.
 app.use('/uploads', express.static(uploadsDir))
+
+if (hasFrontendBuild) {
+  if (fs.existsSync(frontendAssetsDir)) {
+    app.use('/assets', express.static(frontendAssetsDir))
+  }
+
+  if (fs.existsSync(frontendImagesDir)) {
+    app.use('/images', express.static(frontendImagesDir))
+  }
+}
 
 // Sanitize request body from NoSQL injection
 app.use(mongoSanitize())
@@ -143,12 +156,12 @@ app.use('/api/auth/register', authLimiter)
 app.use('/api/auth', authRoutes)
 app.use('/api/surveys', surveyRoutes)
 
-if (fs.existsSync(frontendDistDir)) {
+if (hasFrontendBuild) {
   app.use(express.static(frontendDistDir))
 }
 
 app.get('/', (req, res) => {
-  if (fs.existsSync(frontendDistDir)) {
+  if (hasFrontendBuild) {
     return res.sendFile(path.join(frontendDistDir, 'index.html'))
   }
 
@@ -159,7 +172,7 @@ app.get('/', (req, res) => {
 })
 
 app.get(/^\/(?!api).*/, (req, res, next) => {
-  if (!fs.existsSync(frontendDistDir)) {
+  if (!hasFrontendBuild) {
     return next()
   }
 

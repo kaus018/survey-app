@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: survey-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        sync: false
+      - key: MONGO_URI
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+
+  - type: web
+    name: survey-frontend
+    runtime: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: VITE_BACKEND_URL
+        sync: false
+      - key: VITE_API_URL
+        sync: false

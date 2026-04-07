@@ -34,7 +34,8 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:', 'https:'],
     },
   },
@@ -159,6 +160,11 @@ app.get('/', (req, res) => {
 
 app.get(/^\/(?!api).*/, (req, res, next) => {
   if (!fs.existsSync(frontendDistDir)) {
+    return next()
+  }
+
+  // Let static file requests fall through to the static middleware / 404 handler.
+  if (path.extname(req.path)) {
     return next()
   }
 

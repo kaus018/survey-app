@@ -1,7 +1,7 @@
 import { useAuth } from "../context/AuthContext"
 import { useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react"
-const BACKEND_URL = "http://localhost:5001"
+import { buildAssetUrl } from "../config/api"
 
 export default function Profile() {
   const { user, setUser, logout, token, apiClient } = useAuth()
@@ -119,7 +119,7 @@ export default function Profile() {
     <main className="container profile-main">
       <article className="profile-header">
         <img
-          src={user?.avatar ? `${BACKEND_URL}${user.avatar}` : '/images/Profile-PNG-File.png'}
+          src={user?.avatar ? buildAssetUrl(user.avatar) : '/images/Profile-PNG-File.png'}
           alt="Profile"
           className="profile-avatar"
         />

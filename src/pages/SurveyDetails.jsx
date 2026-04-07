@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom"
 import { useState, useEffect } from "react"
 import { useAuth } from "../context/AuthContext"
+import { buildAssetUrl } from "../config/api"
 
 const getQuestionId = (question, index) => String(question._id || index)
 const formatDiscussionDate = (value) => new Date(value).toLocaleString("ru-RU", {
@@ -609,7 +610,7 @@ export default function SurveyDetails() {
                       <div className="thread-avatar">
                         {comment.user?.avatar ? (
                           <img
-                            src={`http://localhost:5001${comment.user.avatar}`}
+                            src={buildAssetUrl(comment.user.avatar)}
                             alt={comment.user?.username || "User"}
                           />
                         ) : (
@@ -674,7 +675,7 @@ export default function SurveyDetails() {
                                   <div className="thread-reply-avatar">
                                     {reply.user?.avatar ? (
                                       <img
-                                        src={`http://localhost:5001${reply.user.avatar}`}
+                                        src={buildAssetUrl(reply.user.avatar)}
                                         alt={reply.user?.username || "User"}
                                       />
                                     ) : (

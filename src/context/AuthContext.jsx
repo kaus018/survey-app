@@ -1,11 +1,9 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react"
 import axios from "axios"
 import { validateEmail, isInputSafe } from "../utils/security"
+import { API_URL, BACKEND_URL } from "../config/api"
 
 const AuthContext = createContext()
-
-const API_URL = "http://localhost:5001/api"
-const BACKEND_URL = "http://localhost:5001"
 
 // Create axios instance for CSRF token initialization
 const csrfClient = axios.create({

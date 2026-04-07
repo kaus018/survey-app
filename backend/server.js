@@ -14,7 +14,6 @@ import { generateCSRFToken, verifyCSRFToken } from './middleware/csrf.js'
 import { securityLogger, logSuspiciousInput } from './middleware/security.js'
 
 dotenv.config({ path: './.env' })
-console.log('MONGO_URI:', process.env.MONGO_URI)
 connectDB()
 
 const __filename = fileURLToPath(import.meta.url)
@@ -87,18 +86,19 @@ const isAllowedDevOrigin = (origin) => {
   return /^https?:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
 }
 
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+
 // CORS configuration with security best practices
 app.use(cors({
   origin: (origin, callback) => {
-    if (process.env.NODE_ENV === 'production') {
-      const allowedOrigins = ['https://yourdomain.com']
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true)
-      }
-      return callback(new Error(`Origin ${origin} is not allowed by CORS`))
+    if (!origin) {
+      return callback(null, true)
     }
 
-    if (isAllowedDevOrigin(origin)) {
+    if (allowedOrigins.includes(origin) || isAllowedDevOrigin(origin)) {
       return callback(null, true)
     }
 
